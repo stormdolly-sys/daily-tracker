@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>每日愿景对齐系统</title>
+    <!-- 引入 Tailwind CSS (样式) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Vue 3 (逻辑) -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- 引入 Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans SC', sans-serif; background-color: #F3F4F6; }
+        .card { transition: all 0.3s ease; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.5s ease; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #4F46E5; cursor: pointer; border-radius: 50%; }
+    </style>
+</head>
+<body class="text-gray-700">
+
+<div id="app" class="max-w-3xl mx-auto min-h-screen bg-white shadow-xl flex flex-col">
+    
+    <!-- 顶部导航 & 模式切换 -->
+    <header class="bg-indigo-600 text-white p-6 rounded-b-xl shadow-lg sticky top-0 z-50">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold tracking-wide">🧭 每日愿景对齐</h1>
+                <p class="text-indigo-200 text-sm mt-1">{{ todayDate }}</p>
+            </div>
+            <div class="flex bg-indigo-800 rounded-lg p-1">
+                <button @click="mode = 'morning'" :class="{'bg-white text-indigo-800': mode === 'morning', 'text-indigo-300': mode !== 'morning'}" class="px-4 py-2 rounded-md text-sm font-medium transition-colors">☀️ 早晨规划</button>
+                <button @click="mode = 'evening'" :class="{'bg-white text-indigo-800': mode === 'evening', 'text-indigo-300': mode !== 'evening'}" class="px-4 py-2 rounded-md text-sm font-medium transition-colors">🌙 晚间复盘</button>
+            </div>
+        </div>
+        <!-- 自动加载昨日提示 -->
+        <div v-if="yesterdayNote" class="mt-4 bg-indigo-500 bg-opacity-30 p-3 rounded text-sm flex items-start">
+            <span class="mr-2">💡 昨日给今天的提示：</span>
+            <span class="font-medium">{{ yesterdayNote }}</span>
+        </div>
+    </header>
+
+    <main class="flex-grow p-4 sm:p-8 space-y-10">
+
+        <!-- ==================== 1. 状态 & 模式切换 ==================== -->
+        <section v-if="mode === 'morning'" class="animate-fade-in">
+            <div class="text-center mb-8">
+                <p class="text-xl font-serif italic text-gray-600 mb-3">"{{ currentQuote }}"</p>
+                <button @click="shuffleQuote" class="text-xs text-indigo-500 hover:underline">🔄 换一句宣言</button>
+            </div>
+            <div class="bg-slate-50 rounded-xl p-4">
+                <p class="text-sm font-bold text-slate-600 mb-3">🧘‍♀️ 今日允许 (Self-Acceptance)</p>
+                <div class="space-y-2">
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" v-model="data.selfAcceptance" value="不完美" class="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300">
+                        <span class="text-sm text-slate-600">允许自己不完美，带着问题前行</span>
+                    </label>
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" v-model="data.selfAcceptance" value="轻松拥有" class="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300">
+                        <span class="text-sm text-slate-600">允许自己轻松拥有，不必苦行</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="bg-blue-50 p-6 rounded-xl border border-blue-100 mt-4">
+                <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center">🔋 今日状态校准</h2>
+                
+                <div class="mb-5">
+                    <label class="block text-sm font-medium text-gray-500 mb-2">精力水平 (Energy Level)</label>
+                    <div class="flex space-x-4">
+                        <label class="cursor-pointer flex items-center space-x-2 p-3 bg-white rounded-lg border border-gray-200 hover:border-indigo-300 flex-1 justify-center" :class="{'ring-2 ring-indigo-500 border-transparent': data.energyLevel === 'low'}">
+                            <input type="radio" value="low" v-model="data.energyLevel" class="hidden">
+                            <span>🍃 低 (需滋养)</span>
+                        </label>
+                        <label class="cursor-pointer flex items-center space-x-2 p-3 bg-white rounded-lg border border-gray-200 hover:border-indigo-300 flex-1 justify-center" :class="{'ring-2 ring-indigo-500 border-transparent': data.energyLevel === 'medium'}">
+                            <input type="radio" value="medium" v-model="data.energyLevel" class="hidden">
+                            <span>🌊 中 (稳健)</span>
+                        </label>
+                        <label class="cursor-pointer flex items-center space-x-2 p-3 bg-white rounded-lg border border-gray-200 hover:border-indigo-300 flex-1 justify-center" :class="{'ring-2 ring-indigo-500 border-transparent': data.energyLevel === 'high'}">
+                            <input type="radio" value="high" v-model="data.energyLevel" class="hidden">
+                            <span>🔥 高 (突破)</span>
+                        </label>
+                    </div>
+                    <!-- 动态提示 -->
+                    <div v-if="data.energyLevel === 'low'" class="mt-3 text-sm text-amber-600 bg-amber-50 p-2 rounded border border-amber-100">
+                        ☕️ 提示：今天精力较低，请对自己温柔一点。减少任务量，优先保证"最低剂量"的自我滋养。
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-500 mb-2">情绪标签 (Mood)</label>
+                    <div class="flex flex-wrap gap-2">
+                        <label v-for="tag in moodOptions" :key="tag" class="cursor-pointer select-none">
+                            <input type="checkbox" :value="tag" v-model="data.moodTags" class="hidden">
+                            <span class="px-3 py-1 rounded-full text-sm border transition-colors"
+                                  :class="data.moodTags.includes(tag) ? 'bg-indigo-100 text-indigo-700 border-indigo-300' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'">
+                                {{ tag }}
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 2. 三大角色对齐 ==================== -->
+        <section v-if="mode === 'morning'" class="space-y-6">
+            <h2 class="text-xl font-bold text-gray-800 border-l-4 border-indigo-500 pl-3">🎭 今日角色对齐</h2>
+            
+            <!-- 角色 1: 工作者 -->
+            <details class="group bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" open>
+                <summary class="flex justify-between items-center p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors list-none">
+                    <span class="font-bold text-gray-700">💼 角色一：工作者 (专家之路)</span>
+                    <span class="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <div class="p-5 space-y-4">
+         
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-2">今日优先身份（可多选）</label>
+                    <div class="space-y-2">
+                        <label v-for="item in workerOptions" :key="item" class="flex items-start space-x-2">
+                            <input
+                                type="checkbox"
+                                :value="item"
+                                v-model="data.roles.worker.focusIdentity"
+                                class="mt-1 text-indigo-600 focus:ring-indigo-500 rounded"
+                            >
+                            <span class="text-sm text-gray-600">{{ item }}</span>
+                        </label>
+                    </div>  
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase mb-1">
+                            专家成长浪潮：学习 → 创造 → 连接 → 收获
+                        </label>
+                        <div class="flex flex-wrap gap-2 mb-2">
+                            <button v-for="wave in ['学习','创造','连接','收获']" 
+                                @click="data.roles.worker.waveStage = wave"
+                                :class="data.roles.worker.waveStage === wave ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'"
+                                class="px-3 py-1 rounded text-xs font-medium transition-colors">
+                                {{ wave }}
+                            </button>
+                        </div>
+                        <input type="text" v-model="data.roles.worker.growthStep" placeholder="今天我用 30–90 分钟，做这件事来成为公认专家..." class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-200 outline-none">
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-1 text-center">￥3000/h 过滤器，做之前问自己：这件事值得花3000元请人做吗？如果值得，自己做；如果不值，外包或放弃。</p>
+                    <div class="bg-red-50 p-3 rounded-md border border-red-100">
+                        <p class="text-xs font-bold text-red-400 mb-2">⛔️ NOT TO DO</p>
+                        <div class="space-y-2">
+                            <label v-for="item in workerNotDos" :key="item" class="flex items-start space-x-2">
+                                <input type="checkbox" :value="item" v-model="data.roles.worker.notToDo" class="mt-1 text-red-500 focus:ring-red-500 rounded">
+                                <span class="text-sm text-gray-600">{{ item }}</span>
+                            </label>
+                        </div>
+                        <input type="text" v-model="data.roles.worker.customNotToDo" placeholder="今天特意不做的一件事..." class="mt-2 w-full bg-white text-sm p-2 border border-red-200 rounded text-gray-600">
+                    </div>
+                </div>
+            </details>
+
+            <!-- 角色 2: 母亲 -->
+            <details class="group bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <summary class="flex justify-between items-center p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors list-none">
+                    <span class="font-bold text-gray-700">👩‍👧 角色二：母亲 (支持者)</span>
+                    <span class="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <div class="p-5 space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase mb-1">今日陪伴意图</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label v-for="intent in motherIntents" :key="intent" class="cursor-pointer border rounded p-2 text-center text-sm hover:bg-gray-50" :class="{'bg-pink-50 border-pink-300 text-pink-700': data.roles.mother.intent === intent}">
+                                <input type="radio" :value="intent" v-model="data.roles.mother.intent" class="hidden">
+                                {{ intent }}
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase mb-1">一件小事</label>
+                        <input type="text" v-model="data.roles.mother.smallAction" placeholder="支持孩子内在资源成长的一件小事..." class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-pink-200 outline-none">
+                    </div>
+                    <div class="flex flex-wrap gap-4 text-sm text-gray-600">
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" v-model="data.roles.mother.promises" value="不玩手机" class="text-pink-500 rounded">
+                            <span>不边玩边刷手机</span>
+                        </label>
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" v-model="data.roles.mother.promises" value="不评价" class="text-pink-500 rounded">
+                            <span>不用成绩/表现评价</span>
+                        </label>
+                    </div>
+                </div>
+            </details>
+
+            <!-- 角色 3: 自我滋养 -->
+            <details class="group bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <summary class="flex justify-between items-center p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors list-none">
+                    <span class="font-bold text-gray-700">🌿 角色三：自我滋养者</span>
+                    <span class="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <div class="p-5 space-y-4">
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-2">Nourish Type</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button @click="data.roles.selfCare.nourishType = 'body'" 
+                                :class="data.roles.selfCare.nourishType === 'body' ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-slate-200'"
+                                class="flex-1 py-2 px-3 border rounded-lg text-xs hover:bg-emerald-50 hover:border-emerald-200 transition">
+                                🏃‍♀️ 身体投资<br><span class="text-[10px] text-slate-400">未来30年基石</span>
+                            </button>
+                            <button @click="data.roles.selfCare.nourishType = 'wisdom'" 
+                                :class="data.roles.selfCare.nourishType === 'wisdom' ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-slate-200'"
+                                class="flex-1 py-2 px-3 border rounded-lg text-xs hover:bg-emerald-50 hover:border-emerald-200 transition">
+                                🧠 智慧沉淀<br><span class="text-[10px] text-slate-400">哲科/底层逻辑</span>
+                            </button>
+                            <button @click="data.roles.selfCare.nourishType = 'experience'" 
+                                :class="data.roles.selfCare.nourishType === 'experience' ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-slate-200'"
+                                class="flex-1 py-2 px-3 border rounded-lg text-xs hover:bg-emerald-50 hover:border-emerald-200 transition">
+                                🌍 全球体验<br><span class="text-[10px] text-slate-400">15国旅行计划</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div v-if="data.energyLevel === 'low'" class="text-sm text-green-600 bg-green-50 p-2 rounded mb-2">
+                        🌱 能量低模式：只要完成 1-2 个"最低剂量"就很棒了。
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase mb-1">优先滋养领域</label>
+                        <div class="flex space-x-4">
+                            <label v-for="p in ['身体', '心灵', '关系']" :key="p" class="cursor-pointer flex items-center space-x-1">
+                                <input type="radio" :value="p" v-model="data.roles.selfCare.priority" class="text-green-600 focus:ring-green-500">
+                                <span>{{ p }}</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase mb-1">具体行为 (多选)</label>
+                        <div class="space-y-2">
+                            <label v-for="act in selfCareActions" :key="act" class="flex items-center space-x-2">
+                                <input type="checkbox" :value="act" v-model="data.roles.selfCare.actions" class="text-green-600 rounded focus:ring-green-500">
+                                <span class="text-sm">{{ act }}</span>
+                            </label>
+                        </div>
+                        <input type="text" v-model="data.roles.selfCare.customAction" placeholder="一个完全为自己而做的小快乐..." class="mt-2 w-full text-sm p-2 border-b border-gray-200 focus:border-green-500 outline-none">
+                    </div>
+                </div>
+            </details>
+        </section>
+
+        <!-- ==================== 3. ONE THING & 20% ==================== -->
+        <section v-if="mode === 'morning'" class="bg-white p-6 rounded-xl shadow-md border-t-4 border-indigo-600">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                    🏹 今日最重要的一件事 (ONE THING)
+                </h2>
+                <p class="text-xs text-gray-400 mt-1">如果今天只能完成一件事，我希望是...</p>
+                <div class="mt-3">
+                    <input type="text" v-model="data.oneThing.content" placeholder="输入你的头等舱事项..." class="w-full text-lg font-medium p-3 border-b-2 border-indigo-100 focus:border-indigo-600 outline-none transition-colors bg-transparent">
+                </div>
+                <div class="flex space-x-4 mt-3 text-sm">
+                    <label v-for="cat in ['工作', '家庭', '自我']" :key="cat" class="cursor-pointer flex items-center space-x-1 text-gray-500 hover:text-indigo-600">
+                        <input type="radio" :value="cat" v-model="data.oneThing.category" class="text-indigo-600">
+                        <span>{{ cat }}</span>
+                    </label>
+                </div>
+            </div>
+
+            <hr class="border-gray-100 my-6">
+
+            <div>
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-gray-700">⚡️ 20% 关键任务 (Max 3)</h3>
+                    <span v-if="data.keyTasks.length >= 3" class="text-xs text-amber-500 font-medium">已满：其余请移至杂事清单</span>
+                </div>
+                
+                <ul class="space-y-3">
+                    <li v-for="(task, index) in data.keyTasks" :key="index" class="flex items-center space-x-2 bg-gray-50 p-2 rounded">
+                        <input type="checkbox" v-model="task.isDone" class="text-indigo-600 rounded h-5 w-5">
+                        <span :class="{'line-through text-gray-400': task.isDone}" class="flex-grow font-medium">{{ task.title }}</span>
+                        <span class="text-xs bg-gray-200 px-2 py-1 rounded text-gray-600">{{ task.duration }}min</span>
+                        <button @click="removeTask(index)" class="text-gray-400 hover:text-red-500">×</button>
+                    </li>
+                </ul>
+
+                <div v-if="data.keyTasks.length < 3" class="mt-4 flex gap-2">
+                    <input type="text" v-model="newTaskInput" @keyup.enter="addTask" placeholder="添加关键任务..." class="flex-grow p-2 border border-gray-300 rounded text-sm">
+                    <select v-model="newTaskDuration" class="p-2 border border-gray-300 rounded text-sm w-24">
+                        <option value="25">25m</option>
+                        <option value="50">50m</option>
+                        <option value="90">90m</option>
+                    </select>
+                    <button @click="addTask" class="bg-indigo-600 text-white px-4 rounded hover:bg-indigo-700">+</button>
+                </div>
+
+                <!-- 决策辅助 -->
+                <details class="mt-4 text-xs text-gray-500">
+                    <summary class="cursor-pointer hover:text-indigo-600">🤔 这个任务值得做吗？(决策四问)</summary>
+                    <div class="mt-2 pl-2 border-l-2 border-gray-200 space-y-1">
+                        <p>1. 机会成本值得吗？</p>
+                        <p>2. 会消耗过多情绪/身体吗？</p>
+                        <p>3. 是否为 3-5 年愿景直接加分？</p>
+                        <p>4. ⏳ 线性工作（卖时间/交付/会议）or 🚀 杠杆工作（造资产/代码/媒体）？</p>
+                        <p class="text-indigo-500 mt-1">如果连续回答"否"，请勇敢删除它。</p>
+                    </div>
+                </details>
+            </div>
+        </section>
+
+        <!-- ==================== 4. 人脉 & 长期复利 ==================== -->
+        <section v-if="mode === 'morning'" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                <h3 class="font-bold text-gray-700 mb-3">🤝 今日人脉动作</h3>
+                <select v-model="data.networkAction.type" class="w-full mb-2 p-2 text-sm border border-gray-300 rounded">
+                    <option>主动联络 (问候/Catch-up)</option>
+                    <option>创造连接 (介绍认识)</option>
+                    <option>发出邀请</option>
+                    <option>提供帮助 (资源/信息)</option>
+                </select>
+                <input type="text" v-model="data.networkAction.detail" placeholder="具体人 + 动作..." class="w-full p-2 border-b border-gray-200 outline-none text-sm">
+                <p class="text-[10px] text-center text-slate-400 mt-3">泛泛之交(50h) ➔ 真正朋友(90h) ➔ 至交好友(200h)</p>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                <h3 class="font-bold text-gray-700 mb-3">🧠 智者时刻 (学习/思考)</h3>
+                <input type="text" v-model="data.study.topic" placeholder="内容源 (书/课/文章)..." class="w-full mb-2 p-2 text-sm border border-gray-300 rounded">
+                <input type="text" v-model="data.study.question" placeholder="我要思考的一个问题..." class="w-full p-2 border-b border-gray-200 outline-none text-sm">
+            </div>
+        </section>
+
+        <!-- ==================== 5. 晚间回顾 & 明日预告 ==================== -->
+        <section v-if="mode === 'evening'" class="animate-fade-in space-y-8">
+            <div class="text-center">
+                <h2 class="text-2xl font-bold text-indigo-900">🌙 晚间复盘</h2>
+                <p class="text-gray-500">辛苦了，来看看今天的成果。</p>
+            </div>
+
+            <!-- 完成情况 -->
+            <div class="bg-white p-6 rounded-xl shadow-sm">
+                <h3 class="font-bold text-gray-800 mb-4">📊 今日完成度</h3>
+                
+                <div class="mb-6">
+                    <p class="text-sm font-medium text-gray-600 mb-2">ONE THING: <span class="text-indigo-600">{{ data.oneThing.content || '未设定' }}</span></p>
+                    <div class="flex space-x-4">
+                        <button @click="data.review.oneThingStatus = 'done'" :class="data.review.oneThingStatus === 'done' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-white border-gray-200'" class="flex-1 py-2 border rounded-lg text-sm font-medium">✅ 完成了</button>
+                        <button @click="data.review.oneThingStatus = 'partial'" :class="data.review.oneThingStatus === 'partial' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : 'bg-white border-gray-200'" class="flex-1 py-2 border rounded-lg text-sm font-medium">🚧 部分完成</button>
+                        <button @click="data.review.oneThingStatus = 'missed'" :class="data.review.oneThingStatus === 'missed' ? 'bg-gray-100 text-gray-500 border-gray-300' : 'bg-white border-gray-200'" class="flex-1 py-2 border rounded-lg text-sm font-medium">❌ 未完成</button>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <p class="text-xs font-bold text-gray-400 uppercase">角色满意度自评</p>
+                    <div v-for="(label, key) in {'worker':'💼 工作者', 'mother':'👩‍👧 母亲', 'selfCare':'🌿 自我'}" :key="key" class="flex items-center space-x-4">
+                        <span class="w-20 text-sm font-medium text-gray-600">{{ label }}</span>
+                        <input type="range" min="0" max="100" v-model="data.review.roleScores[key]" class="flex-grow h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        <span class="w-8 text-sm text-gray-500">{{ data.review.roleScores[key] }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 三问复盘 -->
+            <div class="bg-white p-6 rounded-xl shadow-sm space-y-4">
+                <h3 class="font-bold text-gray-800">📝 灵魂三问</h3>
+                <div>
+                    <label class="block text-sm text-gray-500 mb-1">✨ 今天最值得感恩 / 高光的一件事：</label>
+                    <textarea v-model="data.review.highlight" rows="2" class="w-full p-3 bg-gray-50 rounded-lg border-transparent focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none text-sm"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-500 mb-1">🔭 今天在哪件事上做了"长期主义"的选择？</label>
+                    <textarea v-model="data.review.longTermChoice" rows="2" class="w-full p-3 bg-gray-50 rounded-lg border-transparent focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none text-sm"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-500 mb-1">🔧 如果明天只改进一件小事：</label>
+                    <textarea v-model="data.review.improveTomorrow" rows="2" class="w-full p-3 bg-gray-50 rounded-lg border-transparent focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none text-sm"></textarea>
+                </div>
+            </div>
+
+            <!-- 明日预告 -->
+            <div class="bg-indigo-50 p-6 rounded-xl border border-indigo-100">
+                <h3 class="font-bold text-indigo-900 mb-2">🌅 留给明天的自己</h3>
+                <input type="text" v-model="data.tomorrowNote" placeholder="例：上午守住 2 小时深度工作，不接临时会..." class="w-full p-3 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-300 outline-none">
+                <p class="text-xs text-indigo-400 mt-2">这句话明天早上会出现在顶部提醒你。</p>
+            </div>
+            
+            <div class="flex justify-center pb-8">
+                <button @click="resetForNewDay" class="text-gray-400 text-sm underline hover:text-red-500">开启新的一天 (清空今日数据)</button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 底部状态栏 -->
+    <footer class="bg-gray-50 p-4 text-center text-xs text-gray-400 border-t">
+        <span v-if="savedStatus === 'saved'" class="text-green-500">✓ 已自动保存</span>
+        <span v-else>正在输入...</span>
+    </footer>
+
+</div>
+
+<script>
+    const { createApp, ref, reactive, watch, onMounted, computed } = Vue;
+
+    createApp({
+        setup() {
+            const mode = ref('morning'); // morning | evening
+            const savedStatus = ref('saved');
+            const newTaskInput = ref('');
+            const newTaskDuration = ref('50');
+
+            // 语录库
+            const quotes = [
+                "我为未来 30 年而活，不为今天的焦虑决策。",
+                "我专注那 20% 能带来 80% 改变的行动。",
+                "我是孩子的稳定内在资源，是客户的清晰智者，也是自己的守护者。",
+                "慢就是快，只要方向是对的。",
+                "不要高估一天的成果，也不要低估三年的积累。",
+                "我值得轻松拥有爱、连接、财富、事业。",
+                "我内在外在的一切都是这一世必经的体验。",  
+                "不要出售时间，要拥有股权。",
+                "战略性耐心：接受2-3年才能看到结果。",
+                "反脆弱：失败损失1倍，成功赚100倍。",
+                "正和博弈：过分慷慨地分享好处。",
+                "我可以带着不完美走向圆满。",
+                "只用20%的时间检验可行性，失败也要有收获。"
+            ];
+            const currentQuote = ref(quotes[0]);
+
+            // 核心数据结构
+            const defaultData = {
+                date: new Date().toLocaleDateString(),
+                energyLevel: 'medium',
+                moodTags: [],
+                selfAcceptance: [],
+                roles: {
+                    // 多选：数组
+                    worker: { focusIdentity: [], waveStage: '创造', growthStep: '', notToDo: [], customNotToDo: '' },
+                    mother: { intent: '情绪容器', smallAction: '', promises: [] },
+                    selfCare: { nourishType: '', priority: '身体', actions: [], customAction: '' }
+                },
+                oneThing: { content: '', category: '工作' },
+                keyTasks: [],
+                networkAction: { type: '主动联络 (问候/Catch-up)', detail: '' },
+                study: { topic: '', question: '' },
+                review: { oneThingStatus: '', roleScores: { worker: 50, mother: 50, selfCare: 50 }, highlight: '', longTermChoice: '', improveTomorrow: '' },
+                tomorrowNote: ''
+            };
+
+            const data = reactive(JSON.parse(JSON.stringify(defaultData)));
+            const yesterdayNote = ref('');
+
+            // 选项配置
+            const moodOptions = ['😌 平静', '😵 焦虑', '😊 期待', '😔 低落', '💡 灵感多'];
+            const workerOptions = ['深度工作（内容创作 / 学习底层逻辑）', '客户服务（交付价值）', '关系构建（人脉、合作）', '整理与反思（整理知识、复盘）'];
+            const workerNotDos = ['不刷信息流超30分钟', '不接无长期价值的活', '不在黄金时间处理杂务'];
+            const motherIntents = ['情绪容器', '好奇共玩', '资源建设', '高质量对话'];
+            const selfCareActions = ['运动 30-60 分钟', '读书 30-60 分钟', '静默反思', '深度对话'];
+
+            // 初始化加载
+            onMounted(() => {
+                const savedData = localStorage.getItem('dailyAlignmentData');
+                if (savedData) {
+                    const parsed = JSON.parse(savedData);
+                    Object.assign(data, parsed);
+
+                    // 🛠 关键修复：确保今日优先身份始终是数组，防止选一个联动全选
+                    const fi = data.roles?.worker?.focusIdentity;
+                    if (!Array.isArray(fi)) {
+                        if (typeof fi === 'string' && fi.trim()) {
+                            data.roles.worker.focusIdentity = [fi];
+                        } else {
+                            data.roles.worker.focusIdentity = [];
+                        }
+                    }
+                }
+                
+                const lastNote = localStorage.getItem('lastDayNote');
+                if (lastNote) yesterdayNote.value = lastNote;
+
+                shuffleQuote();
+            });
+
+            // 自动保存监听
+            watch(data, (newVal) => {
+                savedStatus.value = 'saving...';
+                localStorage.setItem('dailyAlignmentData', JSON.stringify(newVal));
+                if (newVal.tomorrowNote) {
+                    localStorage.setItem('lastDayNote', newVal.tomorrowNote);
+                }
+                setTimeout(() => savedStatus.value = 'saved', 500);
+            }, { deep: true });
+
+            // 方法
+            const shuffleQuote = () => {
+                currentQuote.value = quotes[Math.floor(Math.random() * quotes.length)];
+            };
+
+            const addTask = () => {
+                if (newTaskInput.value.trim() && data.keyTasks.length < 3) {
+                    data.keyTasks.push({
+                        title: newTaskInput.value,
+                        duration: newTaskDuration.value,
+                        isDone: false
+                    });
+                    newTaskInput.value = '';
+                }
+            };
+
+            const removeTask = (index) => {
+                data.keyTasks.splice(index, 1);
+            };
+
+            const resetForNewDay = () => {
+                if(confirm('确定要开启新的一天吗？这将清空今日的所有记录。')) {
+                    const note = data.tomorrowNote;
+                    if(note) localStorage.setItem('lastDayNote', note);
+                    
+                    Object.assign(data, JSON.parse(JSON.stringify(defaultData)));
+                    data.date = new Date().toLocaleDateString();
+                    mode.value = 'morning';
+                    window.scrollTo(0,0);
+                    yesterdayNote.value = note;
+                }
+            };
+
+            const todayDate = computed(() => {
+                const d = new Date();
+                return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+            });
+
+            return {
+                mode, data, savedStatus, todayDate, yesterdayNote,
+                currentQuote, shuffleQuote,
+                moodOptions, workerOptions, workerNotDos, motherIntents, selfCareActions,
+                newTaskInput, newTaskDuration, addTask, removeTask,
+                resetForNewDay
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
