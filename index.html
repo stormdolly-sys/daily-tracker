@@ -18,6 +18,7 @@
         .fade-enter-from, .fade-leave-to { opacity: 0; }
         input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #4F46E5; cursor: pointer; border-radius: 50%; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="text-gray-700">
 
@@ -398,6 +399,9 @@
     createApp({
         setup() {
             const mode = ref('morning'); // morning | evening
+            const SUPABASE_URL = 'https://enimntknynesconozoqs.supabase.co';
+            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVuaW1udGtueW5lc2Nvbm96b3FzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1NzQwMzIsImV4cCI6MjA4MzE1MDAzMn0.n__yEP4mNHkdO4CvlwRuknUMJD4ncakygqlcAKaVu4E';
+            const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY');
             const savedStatus = ref('saved');
             const newTaskInput = ref('');
             const newTaskDuration = ref('50');
@@ -475,14 +479,37 @@
             });
 
             // 自动保存监听
+// --- 替换开始 (watch) ---
+            let saveTimer = null; // 用于防抖
+
             watch(data, (newVal) => {
                 savedStatus.value = 'saving...';
-                localStorage.setItem('dailyAlignmentData', JSON.stringify(newVal));
-                if (newVal.tomorrowNote) {
-                    localStorage.setItem('lastDayNote', newVal.tomorrowNote);
-                }
-                setTimeout(() => savedStatus.value = 'saved', 500);
+                
+                // 清除之前的定时器（防止打字时频繁请求）
+                if (saveTimer) clearTimeout(saveTimer);
+
+                // 延迟 1.5 秒后上传
+                saveTimer = setTimeout(async () => {
+                    const { error } = await _supabase
+                        .from('daily_logs')
+                        .upsert({ 
+                            date: newVal.date, 
+                            content: newVal 
+                        }, { onConflict: 'date' });
+
+                    if (!error) {
+                        savedStatus.value = 'saved';
+                        // 顺便存一下给明天的留言到本地 localStorage 做备份
+                        if (newVal.tomorrowNote) {
+                            localStorage.setItem('lastDayNote', newVal.tomorrowNote);
+                        }
+                    } else {
+                        savedStatus.value = 'error!';
+                        console.error('保存失败:', error);
+                    }
+                }, 1500);
             }, { deep: true });
+            // --- 替换结束 ---
 
             // 方法
             const shuffleQuote = () => {
@@ -534,3 +561,4 @@
 </script>
 </body>
 </html>
+
